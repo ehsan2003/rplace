@@ -3,3 +3,4 @@
 extern crate rstest;
 
 mod rate_limiter;
+mod game;
