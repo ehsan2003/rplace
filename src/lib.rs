@@ -9,4 +9,5 @@ mod chat_manager;
 
 pub mod message_censor;
 mod mock;
+mod message_censor_impl;
 
