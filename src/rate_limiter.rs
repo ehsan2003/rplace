@@ -21,7 +21,7 @@ impl<T: Hash + Eq> RateLimiter<T> {
         let free_at = list.get(key).copied();
 
         match free_at {
-            Some(free_at) => !(free_at > Instant::now()),
+            Some(free_at) => free_at <= Instant::now(),
             None => true,
         }
     }

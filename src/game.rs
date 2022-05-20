@@ -52,7 +52,7 @@ impl Game {
         Ok(Game {
             width: height.width,
             height: height.height,
-            board: Arc::new(RwLock::new(board.into())),
+            board: Arc::new(RwLock::new(board)),
             rate_limiter: RateLimiter::new(height.tile_wait_time),
         })
     }
@@ -84,7 +84,7 @@ pub enum LoadError {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum SetTileError {
+pub enum SetTileError {
     OutOfBounds,
     InvalidColor,
     RateLimited,

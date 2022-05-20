@@ -56,7 +56,7 @@ impl ChatManager {
     ) -> Result<SentMessage, ChatError> {
         let text = self.censorer.censor(message.text.trim()).await;
 
-        if text.len() > self.max_message_length || text.len() < 1 {
+        if text.len() > self.max_message_length || text.is_empty() {
             return Err(ChatError::InvalidMessageLength);
         }
 
@@ -68,7 +68,7 @@ impl ChatManager {
             text,
             sender_id: message.sender_id,
             id: self.id_counter.fetch_add(1, Ordering::Relaxed),
-            reply_to: None,
+            reply_to: message.reply_to,
         })
     }
 }
@@ -131,7 +131,7 @@ mod tests {
                 },
                 censorer_mock.clone(),
             ),
-            censorer_mock.clone(),
+            censorer_mock,
         )
     }
     fn fake_user(msg: impl Into<String>) -> SendMessageInput {
@@ -262,5 +262,13 @@ mod tests {
         manager.censorer = censorer.clone();
         let result = manager.handle_message(fake_user("hello")).await.unwrap();
         assert_eq!(result.text, "censored");
+    }
+    #[rstest]
+    #[tokio::test]
+    async fn it_must_return_reply_id_as_is(manager: ChatManager) {
+        let mut msg = fake_user("hello");
+        msg.reply_to = Some(9807978);
+        let result = manager.handle_message(msg).await.unwrap();
+        assert_eq!(result.reply_to, Some(9807978));
     }
 }

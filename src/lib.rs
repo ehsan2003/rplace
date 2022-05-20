@@ -2,12 +2,11 @@
 #[macro_use]
 extern crate rstest;
 
-mod game;
-mod rate_limiter;
+pub mod game;
+pub mod rate_limiter;
 
-mod chat_manager;
+pub mod chat_manager;
 
 pub mod message_censor;
-mod mock;
-mod message_censor_impl;
-
+pub mod message_censor_impl;
+pub mod mock;

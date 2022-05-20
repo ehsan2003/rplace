@@ -115,7 +115,7 @@ impl<OUTPUT: Send + Sync, INPUT: Clone + Send + Sync> Mock<OUTPUT, INPUT> {
     }
     pub fn get_nth_call_with_time(&self, index: usize) -> Option<(std::time::Instant, INPUT)> {
         let calls = self.calls.lock().unwrap();
-        calls.get(index).map(|e| e.clone())
+        calls.get(index).cloned()
     }
 }
 
@@ -124,7 +124,7 @@ impl<OUTPUT: Send + Sync, INPUT: Clone + Send + Sync> Mock<OUTPUT, INPUT> {
         let calls = self.calls.lock().unwrap();
         assert_eq!(calls.len(), times);
     }
-    pub fn assert_nth_call(&self, n: usize, input: INPUT)
+    pub fn assert_nth_call(&self, n: usize, _input: INPUT)
     where
         INPUT: PartialEq + Debug,
     {
@@ -148,9 +148,9 @@ mod tests {
     use super::*;
     #[test]
     fn it_must_return_default_output() {
-        let mock: Mock<()> = Mock::new().default_output();
+        let mock: Mock<u32> = Mock::new().default_output();
         let result = mock.call(());
-        assert_eq!(result, ());
+        assert_eq!(result, Default::default());
     }
 
     #[test]
@@ -162,7 +162,7 @@ mod tests {
 
     mod generator {
         use super::*;
-        use std::{cell::RefCell, rc::Rc, sync::Arc};
+        use std::sync::Arc;
 
         #[test]
         fn it_must_call_exactly_as_much_as_needed_generator() {
@@ -191,7 +191,7 @@ mod tests {
         use super::*;
         #[test]
         fn it_must_call_fake_with_needed_args() {
-            let mock: Mock<i32, i32> = Mock::new().fake(|(a)| {
+            let mock: Mock<i32, i32> = Mock::new().fake(|a| {
                 assert_eq!(a, 12);
                 42
             });
