@@ -63,7 +63,7 @@ mod tests {
     #[rstest]
     fn it_must_not_be_free_before_time_passed(limiter: RateLimiter<u32>) {
         limiter.mark_as_limited(1);
-        std::thread::sleep(DURATION - Duration::from_millis(1));
+        std::thread::sleep(DURATION - Duration::from_millis(5));
         assert!(!limiter.is_free(&1));
     }
 

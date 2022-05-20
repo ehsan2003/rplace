@@ -4,8 +4,10 @@ name = "backend"
 version = "0.1.0"
 
 [dependencies]
+async-trait = "0.1.53"
 futures = "0.3.21"
 futures-util = "0.3.21"
+rand = "0.8.5"
 tokio = {version = "1.17.0", features = ["full"]}
 warp = "0.3.2"
 
