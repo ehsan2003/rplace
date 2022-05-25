@@ -1,18 +1,18 @@
 use std::{
     collections::HashMap,
     hash::Hash,
-    sync::{Arc, Mutex},
+    sync::Mutex,
     time::{Duration, Instant},
 };
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct RateLimiter<T: Hash + Eq> {
     duration: Duration,
-    list: Arc<Mutex<HashMap<T, Instant>>>,
+    list: Mutex<HashMap<T, Instant>>,
 }
 impl<T: Hash + Eq> RateLimiter<T> {
     pub fn new(d: Duration) -> Self {
         Self {
-            list: Arc::new(Mutex::new(Default::default())),
+            list: (Mutex::new(Default::default())),
             duration: d,
         }
     }
@@ -71,12 +71,5 @@ mod tests {
     fn it_should_work_with_different_keys(limiter: RateLimiter<u32>) {
         limiter.mark_as_limited(1);
         assert!(limiter.is_free(&2));
-    }
-
-    #[rstest]
-    fn clones_must_share_work(limiter: RateLimiter<u32>) {
-        let limiter2 = limiter.clone();
-        limiter.mark_as_limited(1);
-        assert!(!limiter2.is_free(&1));
     }
 }

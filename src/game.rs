@@ -1,32 +1,27 @@
-use std::{
-    net::IpAddr,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{fmt::Display, net::IpAddr, sync::RwLock, time::Duration};
 
 use crate::rate_limiter::RateLimiter;
 const MAX_COLOR: u8 = 31;
-pub struct Config {
+
+#[derive(Debug, Clone)]
+pub struct GameConfig {
     pub width: u32,
     pub height: u32,
     pub tile_wait_time: Duration,
 }
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Game {
     width: u32,
     height: u32,
-    board: Arc<RwLock<Vec<u8>>>,
+    board: RwLock<Vec<u8>>,
     rate_limiter: RateLimiter<IpAddr>,
 }
 impl Game {
-    pub fn new(config: Config) -> Self {
+    pub fn new(config: GameConfig) -> Self {
         Self {
             width: config.width,
             height: config.height,
-            board: Arc::new(RwLock::new(vec![
-                31;
-                (config.width * config.height) as usize
-            ])),
+            board: RwLock::new(vec![31; (config.width * config.height) as usize]),
             rate_limiter: RateLimiter::new(config.tile_wait_time),
         }
     }
@@ -41,7 +36,7 @@ impl Game {
         self.board.read().unwrap().clone()
     }
 
-    pub fn load(board: impl Into<Vec<u8>>, height: Config) -> Result<Game, LoadError> {
+    pub fn load(board: impl Into<Vec<u8>>, height: GameConfig) -> Result<Game, LoadError> {
         let board = board.into();
         if board.len() != (height.width * height.height) as usize {
             return Err(LoadError::InvalidBoardSize);
@@ -52,9 +47,12 @@ impl Game {
         Ok(Game {
             width: height.width,
             height: height.height,
-            board: Arc::new(RwLock::new(board)),
+            board: RwLock::new(board),
             rate_limiter: RateLimiter::new(height.tile_wait_time),
         })
+    }
+    pub fn get_tile_color(&self, idx: u32) -> u8 {
+        self.board.read().unwrap()[(idx) as usize]
     }
     pub fn set_tile(&self, ip: IpAddr, index: u32, color: u8) -> Result<(), SetTileError> {
         if !self.rate_limiter.is_free(&ip) {
@@ -82,6 +80,15 @@ pub enum LoadError {
     InvalidBoardSize,
     InvalidBoardData,
 }
+impl Display for LoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoadError::InvalidBoardSize => write!(f, "Invalid board size"),
+            LoadError::InvalidBoardData => write!(f, "Invalid board data"),
+        }
+    }
+}
+impl std::error::Error for LoadError {}
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum SetTileError {
@@ -90,6 +97,16 @@ pub enum SetTileError {
     RateLimited,
 }
 
+impl Display for SetTileError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SetTileError::OutOfBounds => write!(f, "Out of bounds"),
+            SetTileError::InvalidColor => write!(f, "Invalid color"),
+            SetTileError::RateLimited => write!(f, "Rate limited"),
+        }
+    }
+}
+impl std::error::Error for SetTileError {}
 #[cfg(test)]
 mod tests {
     use std::vec;
@@ -101,7 +118,7 @@ mod tests {
     const RATE_LIMIT_TIME: Duration = Duration::from_millis(100);
     #[fixture]
     fn game() -> Game {
-        Game::new(Config {
+        Game::new(GameConfig {
             width: WIDTH,
             height: HEIGHT,
             tile_wait_time: RATE_LIMIT_TIME,
@@ -126,8 +143,8 @@ mod tests {
     mod load {
         use super::*;
         #[fixture]
-        fn load_conf() -> Config {
-            Config {
+        fn load_conf() -> GameConfig {
+            GameConfig {
                 width: WIDTH,
                 height: HEIGHT,
                 tile_wait_time: RATE_LIMIT_TIME,
@@ -135,7 +152,7 @@ mod tests {
         }
         #[rstest]
         #[test]
-        fn initially_loaded_board_must_exists_as_is(load_conf: Config) {
+        fn initially_loaded_board_must_exists_as_is(load_conf: GameConfig) {
             let loaded_board = vec![24; HEIGHT as usize * WIDTH as usize];
             let game = Game::load(loaded_board.clone(), load_conf).unwrap();
             let snapshot = game.snapshot();
@@ -144,7 +161,7 @@ mod tests {
 
         #[rstest]
         #[test]
-        fn it_must_return_error_if_width_and_height_do_not_match(load_conf: Config) {
+        fn it_must_return_error_if_width_and_height_do_not_match(load_conf: GameConfig) {
             let loaded_board = vec![24; HEIGHT as usize * WIDTH as usize + 1];
             let err =
                 Game::load(loaded_board, load_conf).expect_err("expected load to return error");
@@ -153,7 +170,7 @@ mod tests {
 
         #[rstest]
         #[test]
-        fn it_must_return_error_if_loaded_board_is_invalid(load_conf: Config) {
+        fn it_must_return_error_if_loaded_board_is_invalid(load_conf: GameConfig) {
             let loaded_board = vec![45; HEIGHT as usize * WIDTH as usize];
             let err =
                 Game::load(loaded_board, load_conf).expect_err("expected load to return error");
@@ -212,12 +229,5 @@ mod tests {
             let new_snapshot = game.snapshot();
             assert_eq!(new_snapshot[55], 30);
         }
-    }
-
-    #[rstest]
-    fn multiple_clones_must_share_the_same_board(game: Game) {
-        let game2 = game.clone();
-        game2.set_tile(TEST_IP, 55, 30).unwrap();
-        assert_eq!(game.snapshot(), game2.snapshot());
     }
 }

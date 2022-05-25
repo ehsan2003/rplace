@@ -150,7 +150,7 @@ mod tests {
     fn it_must_return_default_output() {
         let mock: Mock<u32> = Mock::new().default_output();
         let result = mock.call(());
-        assert_eq!(result, Default::default());
+        assert_eq!(result, 0);
     }
 
     #[test]

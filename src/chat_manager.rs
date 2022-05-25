@@ -1,4 +1,5 @@
 use std::{
+    fmt::{Debug, Display, Formatter},
     net::IpAddr,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -9,32 +10,47 @@ use std::{
 
 use crate::{message_censor::MessageCensorer, rate_limiter::RateLimiter};
 
+#[derive(Clone, Debug)]
 pub struct ChatManagerConfig {
     pub max_message_length: usize,
     pub rate_limit_timeout_ms: Duration,
 }
+
 pub struct ChatManager {
     max_message_length: usize,
     rate_limiter: RateLimiter<IpAddr>,
     censorer: Arc<dyn MessageCensorer + Send + Sync>,
     id_counter: AtomicU64,
 }
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SendMessageInput {
-    text: String,
-    sender_id: String,
-    sender_ip: IpAddr,
-    reply_to: Option<u64>,
+    pub text: String,
+    pub channel: String,
+    pub sender_name: String,
+    pub sender_id: String,
+    pub sender_ip: IpAddr,
+    pub reply_to: Option<u64>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChatError {
     RateLimited,
     InvalidMessageLength,
 }
+impl Display for ChatError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChatError::RateLimited => write!(f, "rate limited"),
+            ChatError::InvalidMessageLength => write!(f, "invalid message length"),
+        }
+    }
+}
+impl std::error::Error for ChatError {}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct SentMessage {
     pub text: String,
-    pub sender_id: String,
+    pub channel: String,
+    pub sender_name: String,
     pub id: u64,
     pub reply_to: Option<u64>,
 }
@@ -65,8 +81,9 @@ impl ChatManager {
         }
         self.rate_limiter.mark_as_limited(message.sender_ip);
         Ok(SentMessage {
+            channel: message.channel,
+            sender_name: message.sender_name,
             text,
-            sender_id: message.sender_id,
             id: self.id_counter.fetch_add(1, Ordering::Relaxed),
             reply_to: message.reply_to,
         })
@@ -136,6 +153,8 @@ mod tests {
     }
     fn fake_user(msg: impl Into<String>) -> SendMessageInput {
         SendMessageInput {
+            channel: "dummy".to_string(),
+            sender_name: "sender".to_string(),
             text: msg.into(),
             sender_id: rand::random::<u64>().to_string(),
             sender_ip: random_ip(),
@@ -232,6 +251,8 @@ mod tests {
         let ip = random_ip();
         manager
             .handle_message(SendMessageInput {
+                sender_name: "sender".to_string(),
+                channel: "dummy".to_string(),
                 reply_to: None,
                 sender_id: "1".to_string(),
                 sender_ip: ip,
@@ -242,7 +263,10 @@ mod tests {
 
         let err = manager
             .handle_message(SendMessageInput {
+                sender_name: "sender".to_string(),
+                channel: "dummy".to_string(),
                 reply_to: None,
+
                 sender_id: "2".to_string(),
                 sender_ip: ip,
                 text: "hello2".to_string(),

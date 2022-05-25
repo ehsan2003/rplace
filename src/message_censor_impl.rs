@@ -1,5 +1,5 @@
 use crate::message_censor::MessageCensorer;
-
+#[derive(Debug)]
 pub struct MessageCensorerImpl {}
 
 #[async_trait::async_trait]
