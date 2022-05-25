@@ -2,8 +2,6 @@ use futures::future;
 
 use std::net::SocketAddr;
 
-use warp;
-
 use std::net::IpAddr;
 
 use warp::Filter;

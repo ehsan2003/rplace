@@ -5,6 +5,7 @@ extern crate rstest;
 mod filters;
 pub mod game;
 pub mod rate_limiter;
+mod users_handler;
 
 pub mod chat_manager;
 
@@ -15,10 +16,11 @@ pub mod mock;
 use std::{collections::HashMap, error::Error, net::IpAddr, sync::Arc, time::Duration};
 
 use self::{
-    chat_manager::{ChatManager, ChatManagerConfig, SendMessageInput},
-    game::{Game, GameConfig, SetTileError},
+    chat_manager::{ChatManager, ChatManagerConfig},
+    game::{Game, GameConfig},
     message_censor_impl::MessageCensorerImpl,
 };
+use dtos::{Clients, ServerMessage};
 use futures::{SinkExt, StreamExt};
 use rand::{thread_rng, Rng};
 use rate_limiter::RateLimiterImpl;
@@ -36,8 +38,13 @@ mod dtos;
 #[derive(Debug, Clone)]
 pub struct GeneralConfig {
     pub port: u16,
-    pub game_config: GameConfig,
-    pub message_handler_config: ChatManagerConfig,
+    pub game_width: u32,
+    pub game_height: u32,
+    pub game_tile_wait_time: Duration,
+
+    pub max_message_length: usize,
+    pub message_wait_time: Duration,
+
     pub update_user_count_interval: Duration,
     pub game_file: Option<Vec<u8>>,
 }
@@ -46,33 +53,15 @@ pub struct GeneralConfig {
 pub struct SharedState {
     pub game: Arc<Game>,
     pub message_handler: Arc<ChatManager>,
-    pub broadcast_tx: UnboundedSender<dtos::ServerMessage>,
-    pub clients: Arc<RwLock<HashMap<u64, UnboundedSender<dtos::ServerMessage>>>>,
+    pub broadcast_tx: UnboundedSender<ServerMessage>,
+    pub clients: Clients,
 }
 pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn Error>> {
-    let GeneralConfig {
-        message_handler_config,
-        game_config,
-        game_file,
-        port,
-        update_user_count_interval,
-    } = general_config;
+    let message_handler = create_chat_manager(&general_config);
 
-    let message_censor = Arc::new(MessageCensorerImpl {});
-    let message_handler_rate_limiter = Arc::new(RateLimiterImpl::new(
-        message_handler_config.rate_limit_timeout_ms,
-    ));
-    let message_handler = chat_manager::ChatManager::new(
-        message_handler_config,
-        message_censor.clone(),
-        message_handler_rate_limiter,
-    );
-    let game_rate_limit = Arc::new(RateLimiterImpl::new(game_config.tile_wait_time));
-    let game = match game_file {
-        Some(f) => Game::load(f, game_config, game_rate_limit)?,
-        None => Game::new(game_config, game_rate_limit),
-    };
-    let (broadcast_tx, broadcast_rx) = unbounded_channel::<dtos::ServerMessage>();
+    let game = create_game(&general_config)?;
+
+    let (broadcast_tx, broadcast_rx) = unbounded_channel::<ServerMessage>();
     let clients: dtos::Clients = Arc::new(RwLock::new(HashMap::new()));
     let shared_state = SharedState {
         game: Arc::new(game),
@@ -83,14 +72,38 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn Error>
 
     handle_broadcast_messages(shared_state.clients.clone(), broadcast_rx);
     register_user_count_updater(
-        update_user_count_interval,
+        general_config.update_user_count_interval,
         shared_state.clients.clone(),
         broadcast_tx.clone(),
     );
     warp::serve(get_routes(&shared_state))
-        .run(([127, 0, 0, 1], port))
+        .run(([127, 0, 0, 1], general_config.port))
         .await;
     Ok(())
+}
+
+fn create_game(general_config: &GeneralConfig) -> Result<Game, Box<dyn Error>> {
+    let game_config = GameConfig {
+        width: general_config.game_width,
+        height: general_config.game_height,
+        tile_wait_time: general_config.game_tile_wait_time,
+    };
+    let game_rate_limit = Arc::new(RateLimiterImpl::new(game_config.tile_wait_time));
+    let game = match general_config.game_file.clone() {
+        Some(f) => Game::load(f, game_config, game_rate_limit)?,
+        None => Game::new(game_config, game_rate_limit),
+    };
+    Ok(game)
+}
+
+fn create_chat_manager(general_config: &GeneralConfig) -> ChatManager {
+    let message_censor = Arc::new(MessageCensorerImpl {});
+    let rate_limiter = Arc::new(RateLimiterImpl::new(general_config.message_wait_time));
+    let config = ChatManagerConfig {
+        max_message_length: general_config.max_message_length,
+        rate_limit_timeout_ms: general_config.message_wait_time,
+    };
+    chat_manager::ChatManager::new(config, message_censor, rate_limiter)
 }
 
 fn get_routes(
@@ -104,28 +117,29 @@ fn get_routes(
         .and(warp::ws())
         .and(shared_state_filter.clone())
         .and(filters::ip_extractor())
-        .map(|ws: Ws, ss: SharedState, ip: IpAddr| {
+        .map(|ws: Ws, shared_state: SharedState, ip: IpAddr| {
             ws.on_upgrade(move |w| async move {
-                handle_connection(ss, ip, w).await;
+                handle_connection(shared_state, ip, w).await;
             })
         });
-    let file_getter = warp::path("file")
+    let snapshot = warp::path("snapshot")
         .and(shared_state_filter)
         .map(|s: SharedState| s.game.snapshot());
-    ws.or(file_getter)
+    ws.or(snapshot)
 }
 
-async fn handle_connection(ss: SharedState, ip: IpAddr, socket: warp::ws::WebSocket) {
+async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::ws::WebSocket) {
     let (local_sender, mut local_receiver) = unbounded_channel();
     let random_id = thread_rng().gen::<u64>();
     {
-        ss.clients
+        shared_state
+            .clients
             .write()
             .await
             .insert(random_id, local_sender.clone());
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
-    let handler = UserHandler::new(ss.clone(), ip, local_sender);
+    let handler = users_handler::UserHandler::new(shared_state.clone(), ip, local_sender);
 
     tokio::spawn(async move {
         while let Some(msg) = local_receiver.recv().await {
@@ -152,93 +166,12 @@ async fn handle_connection(ss: SharedState, ip: IpAddr, socket: warp::ws::WebSoc
         };
         handler.handle_incoming(client_message).await;
     }
-    ss.clients.write().await.remove(&random_id);
-}
-pub struct UserHandler {
-    shared_state: SharedState,
-    ip: IpAddr,
-    local_sender: UnboundedSender<dtos::ServerMessage>,
-}
-
-impl UserHandler {
-    pub fn new(
-        shared_state: SharedState,
-        ip: IpAddr,
-        local_sender: UnboundedSender<dtos::ServerMessage>,
-    ) -> Self {
-        Self {
-            shared_state,
-            ip,
-            local_sender,
-        }
-    }
-    pub async fn handle_incoming(&self, msg: dtos::WsClientMessage) -> Result<(), Box<dyn Error>> {
-        match msg {
-            dtos::WsClientMessage::SendMessage(input) => {
-                self.handle_send_message(input).await?;
-            }
-            dtos::WsClientMessage::PlaceTile(input) => {
-                self.handle_set_tile(input).await?;
-            }
-        };
-        Ok(())
-    }
-
-    async fn handle_send_message(
-        &self,
-        input: dtos::WsSendMessageInput,
-    ) -> Result<(), Box<dyn Error>> {
-        let message = SendMessageInput {
-            reply_to: input.reply_to,
-            text: input.text,
-            sender_ip: self.ip,
-            channel: input.channel,
-            sender_name: input.sender_name,
-        };
-        let sent_message = self
-            .shared_state
-            .message_handler
-            .handle_message(message)
-            .await?;
-
-        let message = dtos::ServerMessage::NewMessage {
-            channel: sent_message.channel,
-            text: sent_message.text,
-            sender_name: sent_message.sender_name,
-            reply_to: sent_message.reply_to,
-            id: sent_message.id,
-        };
-        self.shared_state.broadcast_tx.send(message).unwrap();
-        Ok(())
-    }
-
-    async fn handle_set_tile(&self, input: dtos::PlaceTileInput) -> Result<(), Box<dyn Error>> {
-        let res = self
-            .shared_state
-            .game
-            .set_tile(self.ip, input.idx, input.tile)
-            .await;
-        match res {
-            Ok(_) => {
-                let message = dtos::ServerMessage::TilePlaced(input.idx, input.tile);
-                self.shared_state.broadcast_tx.send(message).unwrap();
-            }
-            Err(SetTileError::RateLimited) => {
-                let tile = self.shared_state.game.get_tile_color(input.idx);
-                let message = dtos::ServerMessage::TilePlaced(input.idx, tile);
-                self.local_sender.clone().send(message)?;
-            }
-            Err(t) => {
-                return Err(Box::new(t));
-            }
-        };
-        Ok(())
-    }
+    shared_state.clients.write().await.remove(&random_id);
 }
 
 fn handle_broadcast_messages(
     clients: dtos::Clients,
-    mut broadcast_rx: UnboundedReceiver<dtos::ServerMessage>,
+    mut broadcast_rx: UnboundedReceiver<ServerMessage>,
 ) {
     tokio::spawn(async move {
         while let Some(msg) = broadcast_rx.recv().await {
@@ -253,7 +186,7 @@ fn handle_broadcast_messages(
 fn register_user_count_updater(
     delay: Duration,
     clients: dtos::Clients,
-    broadcast_tx: UnboundedSender<dtos::ServerMessage>,
+    broadcast_tx: UnboundedSender<ServerMessage>,
 ) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(delay);
@@ -263,7 +196,7 @@ fn register_user_count_updater(
             let len = clients.len();
 
             broadcast_tx
-                .send(dtos::ServerMessage::UpdateUserCount(len as u32))
+                .send(ServerMessage::UpdateUserCount(len as u32))
                 .unwrap();
         }
     });
