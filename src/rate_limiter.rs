@@ -46,7 +46,7 @@ impl<T: Hash + Eq + Send + Sync> RateLimiter<T> for RateLimiterImpl<T> {
 mod tests {
     use super::*;
     use std::time::Duration;
-    const DURATION: Duration = Duration::from_millis(10);
+    const DURATION: Duration = Duration::from_millis(100);
     #[fixture]
     fn limiter() -> RateLimiterImpl<u32> {
         RateLimiterImpl::new(DURATION)
@@ -77,7 +77,7 @@ mod tests {
     #[tokio::test]
     async fn it_must_not_be_free_before_time_passed(limiter: RateLimiterImpl<u32>) {
         limiter.mark_as_limited(1).await;
-        std::thread::sleep(DURATION - Duration::from_millis(5));
+        std::thread::sleep(DURATION - Duration::from_millis(50));
         assert!(!limiter.is_free(&1).await);
     }
 

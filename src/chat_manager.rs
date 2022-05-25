@@ -103,7 +103,7 @@ mod tests {
 
     use super::*;
     const MAX_MESSAGE_LENGTH: usize = 400;
-    const RATE_LIMIT_TIMEOUT: Duration = Duration::from_millis(1);
+    const RATE_LIMIT_TIMEOUT: Duration = Duration::from_millis(100);
     #[derive(Default)]
     pub struct MockMessageCensorer {
         pub censor: Mock<String, String>,
