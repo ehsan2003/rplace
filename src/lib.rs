@@ -1,3 +1,4 @@
+#![allow(unused_must_use)]
 #[cfg(test)]
 #[macro_use]
 extern crate rstest;
