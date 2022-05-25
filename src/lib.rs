@@ -24,6 +24,8 @@ use self::{
     message_censor_impl::MessageCensorerImpl,
 };
 use futures::{SinkExt, StreamExt};
+use rand::{thread_rng, Rng};
+use rate_limiter::RateLimiterImpl;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     RwLock,
@@ -48,7 +50,7 @@ pub struct SharedState {
     pub game: Arc<Game>,
     pub message_handler: Arc<ChatManager>,
     pub broadcast_tx: UnboundedSender<ServerMessage>,
-    pub clients: Arc<RwLock<HashMap<String, UnboundedSender<ServerMessage>>>>,
+    pub clients: Arc<RwLock<HashMap<u64, UnboundedSender<ServerMessage>>>>,
 }
 pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn std::error::Error>> {
     let GeneralConfig {
@@ -60,11 +62,18 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn std::e
     } = general_config;
 
     let message_censor = Arc::new(MessageCensorerImpl {});
-    let message_handler =
-        chat_manager::ChatManager::new(message_handler_config, message_censor.clone());
+    let message_handler_rate_limiter = Arc::new(RateLimiterImpl::new(
+        message_handler_config.rate_limit_timeout_ms,
+    ));
+    let message_handler = chat_manager::ChatManager::new(
+        message_handler_config,
+        message_censor.clone(),
+        message_handler_rate_limiter,
+    );
+    let game_rate_limit = Arc::new(RateLimiterImpl::new(game_config.tile_wait_time));
     let game = match game_file {
-        Some(f) => Game::load(f, game_config)?,
-        None => Game::new(game_config),
+        Some(f) => Game::load(f, game_config, game_rate_limit)?,
+        None => Game::new(game_config, game_rate_limit),
     };
     let (broadcast_tx, broadcast_rx) = unbounded_channel::<ServerMessage>();
     let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
@@ -104,20 +113,15 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn std::e
                     }
                 };
 
-                let user_id = cookie.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
-                let user_data = Arc::new(UserData { ip, user_id });
+                let user_data = Arc::new(UserData { ip });
 
-                warp::reply::with_header(
-                    {
-                        let user_data = user_data.clone();
-                        ws.on_upgrade(move |w| async move {
-                            handle_connection(ss, user_data, w).await;
-                        })
-                    },
-                    "Set-Cookie",
-                    format!("user-id={}; Max-Age=0", user_data.user_id),
-                )
-                .into_response()
+                {
+                    let user_data = user_data.clone();
+                    ws.on_upgrade(move |w| async move {
+                        handle_connection(ss, user_data, w).await;
+                    })
+                    .into_response()
+                }
             },
         );
     let file_getter = warp::path("file")
@@ -138,31 +142,16 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn std::e
 
 async fn handle_connection(ss: SharedState, user_data: Arc<UserData>, socket: warp::ws::WebSocket) {
     let (local_sender, mut local_receiver) = unbounded_channel();
+    let random_id = thread_rng().gen::<u64>();
     {
         ss.clients
             .write()
             .await
-            .insert(user_data.user_id.clone(), local_sender.clone());
+            .insert(random_id, local_sender.clone());
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
     let handler = Handler::new(ss.clone(), user_data.clone(), local_sender);
-    tokio::spawn(async move {
-        while let Some(msg) = websocket_receiver.next().await {
-            let client_message = match msg {
-                Ok(msg) if msg.is_text() => match serde_json::from_slice(msg.as_bytes()) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                },
-                Err(_) => {
-                    eprintln!("Error");
-                    break;
-                }
-                _ => continue,
-            };
-            handler.handle_incoming(client_message).await;
-        }
-        ss.clients.write().await.remove(&user_data.user_id.clone());
-    });
+
     tokio::spawn(async move {
         while let Some(msg) = local_receiver.recv().await {
             if let Err(e) = websocket_sender
@@ -174,6 +163,21 @@ async fn handle_connection(ss: SharedState, user_data: Arc<UserData>, socket: wa
             }
         }
     });
+    while let Some(msg) = websocket_receiver.next().await {
+        let client_message = match msg {
+            Ok(msg) if msg.is_text() => match serde_json::from_slice(msg.as_bytes()) {
+                Ok(m) => m,
+                Err(_) => continue,
+            },
+            Err(_) => {
+                eprintln!("Error");
+                break;
+            }
+            _ => continue,
+        };
+        handler.handle_incoming(client_message).await;
+    }
+    ss.clients.write().await.remove(&random_id);
 }
 pub struct Handler {
     shared_state: SharedState,
@@ -213,7 +217,6 @@ impl Handler {
         input: WsSendMessageInput,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let message = SendMessageInput {
-            sender_id: self.user_data.clone().user_id.clone(),
             reply_to: input.reply_to,
             text: input.text,
             sender_ip: self.user_data.clone().ip,
@@ -326,6 +329,5 @@ pub struct PlaceTileInput {
 }
 pub struct UserData {
     pub ip: IpAddr,
-    pub user_id: String,
 }
-pub type Clients = Arc<RwLock<HashMap<String, UnboundedSender<ServerMessage>>>>;
+pub type Clients = Arc<RwLock<HashMap<u64, UnboundedSender<ServerMessage>>>>;

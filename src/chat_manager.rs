@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{message_censor::MessageCensorer, rate_limiter::RateLimiterImpl};
+use crate::{message_censor::MessageCensorer, rate_limiter::SharedRateLimiter};
 
 #[derive(Clone, Debug)]
 pub struct ChatManagerConfig {
@@ -18,7 +18,7 @@ pub struct ChatManagerConfig {
 
 pub struct ChatManager {
     max_message_length: usize,
-    rate_limiter: RateLimiterImpl<IpAddr>,
+    rate_limiter: SharedRateLimiter<IpAddr>,
     censorer: Arc<dyn MessageCensorer + Send + Sync>,
     id_counter: AtomicU64,
 }
@@ -27,7 +27,6 @@ pub struct SendMessageInput {
     pub text: String,
     pub channel: String,
     pub sender_name: String,
-    pub sender_id: String,
     pub sender_ip: IpAddr,
     pub reply_to: Option<u64>,
 }
@@ -58,11 +57,12 @@ impl ChatManager {
     pub fn new(
         config: ChatManagerConfig,
         censorer: Arc<dyn MessageCensorer + Send + Sync>,
+        rate_limiter: SharedRateLimiter<IpAddr>,
     ) -> Self {
         ChatManager {
             max_message_length: config.max_message_length,
             censorer,
-            rate_limiter: RateLimiterImpl::new(config.rate_limit_timeout_ms),
+            rate_limiter,
             id_counter: AtomicU64::new(0),
         }
     }
@@ -99,7 +99,7 @@ mod tests {
         time::Duration,
     };
 
-    use crate::mock::Mock;
+    use crate::{mock::Mock, rate_limiter::RateLimiterImpl};
 
     use super::*;
     const MAX_MESSAGE_LENGTH: usize = 400;
@@ -127,18 +127,27 @@ mod tests {
         Arc::new(MockMessageCensorer::new(Mock::new().fake(|s| s)))
     }
     #[fixture]
-    fn manager(censorer_mock: Arc<MockMessageCensorer>) -> ChatManager {
+    fn rate_limiter() -> Arc<RateLimiterImpl<IpAddr>> {
+        Arc::new(RateLimiterImpl::new(RATE_LIMIT_TIMEOUT))
+    }
+    #[fixture]
+    fn manager(
+        censorer_mock: Arc<MockMessageCensorer>,
+        rate_limiter: Arc<RateLimiterImpl<IpAddr>>,
+    ) -> ChatManager {
         ChatManager::new(
             ChatManagerConfig {
                 max_message_length: MAX_MESSAGE_LENGTH,
                 rate_limit_timeout_ms: RATE_LIMIT_TIMEOUT,
             },
             censorer_mock,
+            rate_limiter,
         )
     }
     #[fixture]
     fn manager_with_censorer(
         censorer_mock: Arc<MockMessageCensorer>,
+        rate_limiter: Arc<RateLimiterImpl<IpAddr>>,
     ) -> (ChatManager, Arc<MockMessageCensorer>) {
         (
             ChatManager::new(
@@ -147,6 +156,7 @@ mod tests {
                     rate_limit_timeout_ms: RATE_LIMIT_TIMEOUT,
                 },
                 censorer_mock.clone(),
+                rate_limiter,
             ),
             censorer_mock,
         )
@@ -156,7 +166,6 @@ mod tests {
             channel: "dummy".to_string(),
             sender_name: "sender".to_string(),
             text: msg.into(),
-            sender_id: rand::random::<u64>().to_string(),
             sender_ip: random_ip(),
             reply_to: None,
         }
@@ -254,7 +263,6 @@ mod tests {
                 sender_name: "sender".to_string(),
                 channel: "dummy".to_string(),
                 reply_to: None,
-                sender_id: "1".to_string(),
                 sender_ip: ip,
                 text: "hello".to_string(),
             })
@@ -266,8 +274,6 @@ mod tests {
                 sender_name: "sender".to_string(),
                 channel: "dummy".to_string(),
                 reply_to: None,
-
-                sender_id: "2".to_string(),
                 sender_ip: ip,
                 text: "hello2".to_string(),
             })

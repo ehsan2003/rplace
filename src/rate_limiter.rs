@@ -1,21 +1,22 @@
 use std::{
     collections::HashMap,
     hash::Hash,
-    sync::Mutex,
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
 #[async_trait::async_trait]
-pub trait RateLimiter<T: Hash + Eq + Send> {
+pub trait RateLimiter<T: Hash + Eq + Send + Sync>: Send + Sync {
     async fn is_free(&self, key: &T) -> bool;
-    async fn mark_as_limited(&self, key: &T);
+    async fn mark_as_limited(&self, key: T);
 }
+pub type SharedRateLimiter<T> = Arc<dyn RateLimiter<T>>;
 #[derive(Debug)]
-pub struct RateLimiterImpl<T: Hash + Eq> {
+pub struct RateLimiterImpl<T: Hash + Eq + Send + Sync> {
     duration: Duration,
     list: Mutex<HashMap<T, Instant>>,
 }
-impl<T: Hash + Eq> RateLimiterImpl<T> {
+impl<T: Hash + Eq + Send + Sync> RateLimiterImpl<T> {
     pub fn new(d: Duration) -> Self {
         Self {
             list: (Mutex::new(Default::default())),
@@ -23,9 +24,9 @@ impl<T: Hash + Eq> RateLimiterImpl<T> {
         }
     }
 }
-
-impl<T: Hash + Eq+Send> RateLimiterImpl<T> {
-    pub async fn is_free(&self, key: &T) -> bool {
+#[async_trait::async_trait]
+impl<T: Hash + Eq + Send + Sync> RateLimiter<T> for RateLimiterImpl<T> {
+    async fn is_free(&self, key: &T) -> bool {
         let list = self.list.lock().unwrap();
         let free_at = list.get(key).copied();
 
@@ -34,7 +35,7 @@ impl<T: Hash + Eq+Send> RateLimiterImpl<T> {
             None => true,
         }
     }
-    pub async fn mark_as_limited(&self, key: T) {
+    async fn mark_as_limited(&self, key: T) {
         self.list
             .lock()
             .unwrap()
