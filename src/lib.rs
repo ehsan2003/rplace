@@ -90,16 +90,11 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn std::e
     };
     let ws = warp::path("ws")
         .and(warp::filters::addr::remote())
-        .and(warp::filters::cookie::optional("user-id"))
         .and(warp::ws())
         .and(warp::filters::header::optional("X-Forwarded-For"))
         .and(shared_state_filter.clone())
         .map(
-            |addr: Option<SocketAddr>,
-             cookie: Option<String>,
-             ws: Ws,
-             forwarded_for: Option<IpAddr>,
-             ss: SharedState| {
+            |addr: Option<SocketAddr>, ws: Ws, forwarded_for: Option<IpAddr>, ss: SharedState| {
                 let ip = match forwarded_for
                     .iter()
                     .chain(addr.map(|a| a.ip()).iter())
@@ -113,12 +108,9 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn std::e
                     }
                 };
 
-                let user_data = Arc::new(UserData { ip });
-
                 {
-                    let user_data = user_data.clone();
                     ws.on_upgrade(move |w| async move {
-                        handle_connection(ss, user_data, w).await;
+                        handle_connection(ss, ip, w).await;
                     })
                     .into_response()
                 }
@@ -140,7 +132,7 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn std::e
     Ok(())
 }
 
-async fn handle_connection(ss: SharedState, user_data: Arc<UserData>, socket: warp::ws::WebSocket) {
+async fn handle_connection(ss: SharedState, ip: IpAddr, socket: warp::ws::WebSocket) {
     let (local_sender, mut local_receiver) = unbounded_channel();
     let random_id = thread_rng().gen::<u64>();
     {
@@ -150,7 +142,7 @@ async fn handle_connection(ss: SharedState, user_data: Arc<UserData>, socket: wa
             .insert(random_id, local_sender.clone());
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
-    let handler = Handler::new(ss.clone(), user_data.clone(), local_sender);
+    let handler = Handler::new(ss.clone(), ip, local_sender);
 
     tokio::spawn(async move {
         while let Some(msg) = local_receiver.recv().await {
@@ -181,19 +173,19 @@ async fn handle_connection(ss: SharedState, user_data: Arc<UserData>, socket: wa
 }
 pub struct Handler {
     shared_state: SharedState,
-    user_data: Arc<UserData>,
+    ip: IpAddr,
     local_sender: UnboundedSender<ServerMessage>,
 }
 
 impl Handler {
     pub fn new(
         shared_state: SharedState,
-        user_data: Arc<UserData>,
+        ip: IpAddr,
         local_sender: UnboundedSender<ServerMessage>,
     ) -> Self {
         Self {
             shared_state,
-            user_data,
+            ip,
             local_sender,
         }
     }
@@ -219,7 +211,7 @@ impl Handler {
         let message = SendMessageInput {
             reply_to: input.reply_to,
             text: input.text,
-            sender_ip: self.user_data.clone().ip,
+            sender_ip: self.ip,
             channel: input.channel,
             sender_name: input.sender_name,
         };
@@ -247,7 +239,7 @@ impl Handler {
         let res = self
             .shared_state
             .game
-            .set_tile(self.user_data.clone().ip, input.idx, input.tile)
+            .set_tile(self.ip, input.idx, input.tile)
             .await;
         match res {
             Ok(_) => {
@@ -257,7 +249,7 @@ impl Handler {
             Err(SetTileError::RateLimited) => {
                 let tile = self.shared_state.game.get_tile_color(input.idx);
                 let message = ServerMessage::TilePlaced(input.idx, tile);
-                self.local_sender.clone().send(message).unwrap();
+                self.local_sender.clone().send(message)?;
             }
             Err(t) => {
                 return Err(Box::new(t));
@@ -272,7 +264,7 @@ fn handle_broadcast_messages(clients: Clients, mut broadcast_rx: UnboundedReceiv
         while let Some(msg) = broadcast_rx.recv().await {
             let clients = clients.read().await;
             for (_, tx) in clients.iter() {
-                tx.send(msg.clone()).unwrap();
+                tx.send(msg.clone());
             }
         }
     });
@@ -327,7 +319,5 @@ pub struct PlaceTileInput {
     pub idx: u32,
     pub tile: u8,
 }
-pub struct UserData {
-    pub ip: IpAddr,
-}
+
 pub type Clients = Arc<RwLock<HashMap<u64, UnboundedSender<ServerMessage>>>>;
