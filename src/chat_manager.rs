@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use crate::{message_censor::MessageCensorer, rate_limiter::RateLimiter};
+use crate::{message_censor::MessageCensorer, rate_limiter::RateLimiterImpl};
 
 #[derive(Clone, Debug)]
 pub struct ChatManagerConfig {
@@ -18,7 +18,7 @@ pub struct ChatManagerConfig {
 
 pub struct ChatManager {
     max_message_length: usize,
-    rate_limiter: RateLimiter<IpAddr>,
+    rate_limiter: RateLimiterImpl<IpAddr>,
     censorer: Arc<dyn MessageCensorer + Send + Sync>,
     id_counter: AtomicU64,
 }
@@ -62,7 +62,7 @@ impl ChatManager {
         ChatManager {
             max_message_length: config.max_message_length,
             censorer,
-            rate_limiter: RateLimiter::new(config.rate_limit_timeout_ms),
+            rate_limiter: RateLimiterImpl::new(config.rate_limit_timeout_ms),
             id_counter: AtomicU64::new(0),
         }
     }
@@ -76,10 +76,10 @@ impl ChatManager {
             return Err(ChatError::InvalidMessageLength);
         }
 
-        if !self.rate_limiter.is_free(&message.sender_ip) {
+        if !self.rate_limiter.is_free(&message.sender_ip).await {
             return Err(ChatError::RateLimited);
         }
-        self.rate_limiter.mark_as_limited(message.sender_ip);
+        self.rate_limiter.mark_as_limited(message.sender_ip).await;
         Ok(SentMessage {
             channel: message.channel,
             sender_name: message.sender_name,

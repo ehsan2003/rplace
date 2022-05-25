@@ -4,19 +4,28 @@ use std::{
     sync::Mutex,
     time::{Duration, Instant},
 };
+
+#[async_trait::async_trait]
+pub trait RateLimiter<T: Hash + Eq + Send> {
+    async fn is_free(&self, key: &T) -> bool;
+    async fn mark_as_limited(&self, key: &T);
+}
 #[derive(Debug)]
-pub struct RateLimiter<T: Hash + Eq> {
+pub struct RateLimiterImpl<T: Hash + Eq> {
     duration: Duration,
     list: Mutex<HashMap<T, Instant>>,
 }
-impl<T: Hash + Eq> RateLimiter<T> {
+impl<T: Hash + Eq> RateLimiterImpl<T> {
     pub fn new(d: Duration) -> Self {
         Self {
             list: (Mutex::new(Default::default())),
             duration: d,
         }
     }
-    pub fn is_free(&self, key: &T) -> bool {
+}
+
+impl<T: Hash + Eq+Send> RateLimiterImpl<T> {
+    pub async fn is_free(&self, key: &T) -> bool {
         let list = self.list.lock().unwrap();
         let free_at = list.get(key).copied();
 
@@ -25,7 +34,7 @@ impl<T: Hash + Eq> RateLimiter<T> {
             None => true,
         }
     }
-    pub fn mark_as_limited(&self, key: T) {
+    pub async fn mark_as_limited(&self, key: T) {
         self.list
             .lock()
             .unwrap()
@@ -38,38 +47,43 @@ mod tests {
     use std::time::Duration;
     const DURATION: Duration = Duration::from_millis(10);
     #[fixture]
-    fn limiter() -> RateLimiter<u32> {
-        RateLimiter::new(DURATION)
+    fn limiter() -> RateLimiterImpl<u32> {
+        RateLimiterImpl::new(DURATION)
     }
 
     #[rstest]
-    fn it_must_free_at_first_call(limiter: RateLimiter<u32>) {
-        assert!(limiter.is_free(&1));
+    #[tokio::test]
+    async fn it_must_free_at_first_call(limiter: RateLimiterImpl<u32>) {
+        assert!(limiter.is_free(&1).await);
     }
 
     #[rstest]
-    fn it_must_not_be_free_after_marked_as_limited(limiter: RateLimiter<u32>) {
-        limiter.mark_as_limited(1);
-        assert!(!limiter.is_free(&1));
+    #[tokio::test]
+    async fn it_must_not_be_free_after_marked_as_limited(limiter: RateLimiterImpl<u32>) {
+        limiter.mark_as_limited(1).await;
+        assert!(!limiter.is_free(&1).await);
     }
 
     #[rstest]
-    fn it_must_be_free_after_time_passed(limiter: RateLimiter<u32>) {
-        limiter.mark_as_limited(1);
+    #[tokio::test]
+    async fn it_must_be_free_after_time_passed(limiter: RateLimiterImpl<u32>) {
+        limiter.mark_as_limited(1).await;
         std::thread::sleep(DURATION + Duration::from_millis(1));
-        assert!(limiter.is_free(&1));
+        assert!(limiter.is_free(&1).await);
     }
 
     #[rstest]
-    fn it_must_not_be_free_before_time_passed(limiter: RateLimiter<u32>) {
-        limiter.mark_as_limited(1);
+    #[tokio::test]
+    async fn it_must_not_be_free_before_time_passed(limiter: RateLimiterImpl<u32>) {
+        limiter.mark_as_limited(1).await;
         std::thread::sleep(DURATION - Duration::from_millis(5));
-        assert!(!limiter.is_free(&1));
+        assert!(!limiter.is_free(&1).await);
     }
 
     #[rstest]
-    fn it_should_work_with_different_keys(limiter: RateLimiter<u32>) {
-        limiter.mark_as_limited(1);
-        assert!(limiter.is_free(&2));
+    #[tokio::test]
+    async fn it_should_work_with_different_keys(limiter: RateLimiterImpl<u32>) {
+        limiter.mark_as_limited(1).await;
+        assert!(limiter.is_free(&2).await);
     }
 }

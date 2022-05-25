@@ -202,7 +202,7 @@ impl Handler {
                 self.handle_send_message(input).await?;
             }
             WsClientMessage::PlaceTile(input) => {
-                self.handle_set_tile(input)?;
+                self.handle_set_tile(input).await?;
             }
         };
         Ok(())
@@ -237,11 +237,15 @@ impl Handler {
         Ok(())
     }
 
-    fn handle_set_tile(&self, input: PlaceTileInput) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_set_tile(
+        &self,
+        input: PlaceTileInput,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let res = self
             .shared_state
             .game
-            .set_tile(self.user_data.clone().ip, input.idx, input.tile);
+            .set_tile(self.user_data.clone().ip, input.idx, input.tile)
+            .await;
         match res {
             Ok(_) => {
                 let message = ServerMessage::TilePlaced(input.idx, input.tile);
