@@ -19,7 +19,7 @@ pub struct UserHandler {
 }
 
 impl UserHandler {
-    pub fn new(
+    pub(crate) fn new(
         shared_state: SharedState,
         ip: IpAddr,
         local_sender: UnboundedSender<dtos::ServerMessage>,

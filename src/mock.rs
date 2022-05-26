@@ -1,4 +1,7 @@
+#![allow(dead_code)]
+
 use std::{fmt::Debug, sync::Mutex};
+
 
 pub struct Mock<OUTPUT: Send + Sync, INPUT: Send + Sync = ()>
 where
@@ -7,11 +10,13 @@ where
     executor: Box<dyn Fn(INPUT) -> OUTPUT + Sync + Send>,
     calls: Mutex<Vec<(std::time::Instant, INPUT)>>,
 }
+
 impl<OUTPUT: Send + Sync, INPUT: Clone + Send + Sync> Default for Mock<OUTPUT, INPUT> {
     fn default() -> Self {
         Self::new()
     }
 }
+
 impl<OUTPUT: Sync + Send, INPUT: Clone + Send + Sync> Mock<OUTPUT, INPUT> {
     pub fn new() -> Self {
         Self {

@@ -3,16 +3,17 @@
 #[macro_use]
 extern crate rstest;
 mod filters;
-pub mod game;
-pub mod rate_limiter;
+mod game;
+mod rate_limiter;
 mod users_handler;
 
-pub mod chat_manager;
+mod chat_manager;
 
-pub mod message_censor;
-pub mod message_censor_impl;
-pub mod mock;
-
+mod dtos;
+mod message_censor;
+mod message_censor_impl;
+#[cfg(test)]
+mod mock;
 use std::{collections::HashMap, error::Error, net::IpAddr, sync::Arc, time::Duration};
 
 use self::{
@@ -33,8 +34,6 @@ use warp::{
     Filter, Reply,
 };
 
-mod dtos;
-
 #[derive(Debug, Clone)]
 pub struct GeneralConfig {
     pub port: u16,
@@ -50,7 +49,7 @@ pub struct GeneralConfig {
 }
 
 #[derive(Clone)]
-pub struct SharedState {
+pub(crate) struct SharedState {
     pub game: Arc<Game>,
     pub message_handler: Arc<ChatManager>,
     pub broadcast_tx: UnboundedSender<ServerMessage>,

@@ -40,9 +40,11 @@ impl Game {
             rate_limiter,
         }
     }
+    #[allow(dead_code)]
     pub fn get_width(&self) -> u32 {
         self.width
     }
+    #[allow(dead_code)]
     pub fn get_height(&self) -> u32 {
         self.height
     }
