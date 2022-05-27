@@ -2,7 +2,6 @@
 
 use std::{fmt::Debug, sync::Mutex};
 
-
 pub struct Mock<OUTPUT: Send + Sync, INPUT: Send + Sync = ()>
 where
     INPUT: Clone,

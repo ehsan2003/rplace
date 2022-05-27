@@ -1,9 +1,9 @@
 use std::time::Duration;
 
-use backend::{run_app, GeneralConfig};
+use backend::{run_app, GeneralConfig, GenericResult};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> GenericResult<()> {
     let general_config = GeneralConfig {
         max_message_length: 400,
         message_wait_time: Duration::from_millis(1),

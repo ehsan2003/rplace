@@ -4,11 +4,13 @@
 extern crate rstest;
 mod filters;
 mod game;
+use core::marker::Send;
 mod rate_limiter;
 mod users_handler;
 
 mod chat_manager;
 
+pub mod client;
 mod dtos;
 mod message_censor;
 mod message_censor_impl;
@@ -23,6 +25,7 @@ use self::{
 };
 use dtos::{Clients, ServerMessage};
 use futures::{SinkExt, StreamExt};
+
 use rand::{thread_rng, Rng};
 use rate_limiter::RateLimiterImpl;
 use tokio::sync::{
@@ -33,6 +36,7 @@ use warp::{
     ws::{Message, Ws},
     Filter, Reply,
 };
+pub type GenericResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
 
 #[derive(Debug, Clone)]
 pub struct GeneralConfig {
@@ -55,7 +59,7 @@ pub(crate) struct SharedState {
     pub broadcast_tx: UnboundedSender<ServerMessage>,
     pub clients: Clients,
 }
-pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn Error>> {
+pub async fn run_app(general_config: GeneralConfig) -> GenericResult<()> {
     let message_handler = create_chat_manager(&general_config);
 
     let game = create_game(&general_config)?;
@@ -81,13 +85,16 @@ pub async fn run_app(general_config: GeneralConfig) -> Result<(), Box<dyn Error>
     Ok(())
 }
 
-fn create_game(general_config: &GeneralConfig) -> Result<Game, Box<dyn Error>> {
+fn create_game(
+    general_config: &GeneralConfig,
+) -> Result<Game, Box<dyn std::error::Error + Send + Sync + 'static>> {
     let game_config = GameConfig {
         width: general_config.game_width,
         height: general_config.game_height,
         tile_wait_time: general_config.game_tile_wait_time,
     };
     let game_rate_limit = Arc::new(RateLimiterImpl::new(game_config.tile_wait_time));
+
     let game = match general_config.game_file.clone() {
         Some(f) => Game::load(f, game_config, game_rate_limit)?,
         None => Game::new(game_config, game_rate_limit),

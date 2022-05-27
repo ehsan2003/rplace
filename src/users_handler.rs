@@ -1,16 +1,14 @@
-use crate::dtos;
+use crate::{dtos,  GenericResult, SharedState};
 
 use super::game::SetTileError;
 
 use super::chat_manager::SendMessageInput;
 
-use std::error::Error;
-
 use tokio::sync::mpsc::UnboundedSender;
 
 use std::net::IpAddr;
 
-use super::SharedState;
+
 
 pub struct UserHandler {
     pub(crate) shared_state: SharedState,
@@ -30,7 +28,7 @@ impl UserHandler {
             local_sender,
         }
     }
-    pub async fn handle_incoming(&self, msg: dtos::WsClientMessage) -> Result<(), Box<dyn Error>> {
+    pub async fn handle_incoming(&self, msg: dtos::WsClientMessage) -> GenericResult<()> {
         match msg {
             dtos::WsClientMessage::SendMessage(input) => {
                 self.handle_send_message(input).await?;
@@ -45,7 +43,7 @@ impl UserHandler {
     pub(crate) async fn handle_send_message(
         &self,
         input: dtos::WsSendMessageInput,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> GenericResult<()> {
         let message = SendMessageInput {
             reply_to: input.reply_to,
             text: input.text,
@@ -70,10 +68,7 @@ impl UserHandler {
         Ok(())
     }
 
-    pub(crate) async fn handle_set_tile(
-        &self,
-        input: dtos::PlaceTileInput,
-    ) -> Result<(), Box<dyn Error>> {
+    pub(crate) async fn handle_set_tile(&self, input: dtos::PlaceTileInput) -> GenericResult<()> {
         let res = self
             .shared_state
             .game

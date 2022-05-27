@@ -101,6 +101,7 @@ pub enum LoadError {
     InvalidBoardSize,
     InvalidBoardData,
 }
+
 impl Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
