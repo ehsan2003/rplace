@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     hash::Hash,
-    sync::{Arc, Mutex},
+    sync::{Arc, RwLock},
     time::{Duration, Instant},
 };
 
@@ -14,12 +14,12 @@ pub type SharedRateLimiter<T> = Arc<dyn RateLimiter<T>>;
 #[derive(Debug)]
 pub struct RateLimiterImpl<T: Hash + Eq + Send + Sync> {
     duration: Duration,
-    list: Mutex<HashMap<T, Instant>>,
+    list: RwLock<HashMap<T, Instant>>,
 }
 impl<T: Hash + Eq + Send + Sync> RateLimiterImpl<T> {
     pub fn new(d: Duration) -> Self {
         Self {
-            list: (Mutex::new(Default::default())),
+            list: (RwLock::new(Default::default())),
             duration: d,
         }
     }
@@ -27,7 +27,7 @@ impl<T: Hash + Eq + Send + Sync> RateLimiterImpl<T> {
 #[async_trait::async_trait]
 impl<T: Hash + Eq + Send + Sync> RateLimiter<T> for RateLimiterImpl<T> {
     async fn is_free(&self, key: &T) -> bool {
-        let list = self.list.lock().unwrap();
+        let list = self.list.read().unwrap();
         let free_at = list.get(key).copied();
 
         match free_at {
@@ -37,7 +37,7 @@ impl<T: Hash + Eq + Send + Sync> RateLimiter<T> for RateLimiterImpl<T> {
     }
     async fn mark_as_limited(&self, key: T) {
         self.list
-            .lock()
+            .write()
             .unwrap()
             .insert(key, Instant::now() + self.duration);
     }
