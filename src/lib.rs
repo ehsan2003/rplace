@@ -29,6 +29,7 @@ use futures::{SinkExt, StreamExt};
 
 use rand::{thread_rng, Rng};
 use rate_limiter_impl::RateLimiterImpl;
+use rgb::RGB8;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     RwLock,
@@ -51,6 +52,8 @@ pub struct GeneralConfig {
 
     pub update_user_count_interval: Duration,
     pub game_file: Option<Vec<u8>>,
+
+    pub pallette: HashMap<u8, RGB8>,
 }
 
 #[derive(Clone)]
