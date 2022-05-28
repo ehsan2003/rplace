@@ -17,7 +17,7 @@ mod message_censor;
 mod message_censor_impl;
 #[cfg(test)]
 mod mock;
-use std::{collections::HashMap, error::Error, net::IpAddr, sync::Arc, time::Duration};
+use std::{collections::HashMap, error::Error, net::IpAddr, ops::Deref, sync::Arc, time::Duration};
 
 use self::{
     chat_manager::{ChatManager, ChatManagerConfig},
@@ -83,7 +83,7 @@ pub async fn run_app(general_config: GeneralConfig) -> GenericResult<()> {
         shared_state.clients.clone(),
         broadcast_tx.clone(),
     );
-    warp::serve(get_routes(&shared_state))
+    warp::serve(get_routes(&shared_state, Arc::new(general_config.pallette)))
         .run(([127, 0, 0, 1], general_config.port))
         .await;
     Ok(())
@@ -118,6 +118,7 @@ fn create_chat_manager(general_config: &GeneralConfig) -> ChatManager {
 
 fn get_routes(
     shared_state: &SharedState,
+    pallette: Arc<HashMap<u8, RGB8>>,
 ) -> impl Filter<Extract = impl Reply, Error = warp::Rejection> + Clone {
     let shared_state_filter = {
         let t = shared_state.clone();
@@ -135,7 +136,10 @@ fn get_routes(
     let snapshot = warp::path("snapshot")
         .and(shared_state_filter)
         .map(|s: SharedState| s.game.snapshot());
-    ws.or(snapshot)
+    let pallette = warp::path("pallette")
+        .map(move || pallette.clone())
+        .map(|p: Arc<HashMap<u8, RGB8>>| warp::reply::json(p.deref()));
+    ws.or(snapshot).or(pallette)
 }
 
 async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::ws::WebSocket) {

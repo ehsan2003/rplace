@@ -42,7 +42,7 @@ async fn main() -> GenericResult<()> {
     .iter()
     .map(|f| {
         RGB8::new(
-            (16 >> f & 0xff) as u8,
+            (f>> 16 & 0xff) as u8,
             (f >> 8 & 0xff) as u8,
             (f & 0xff) as u8,
         )
