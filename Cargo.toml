@@ -1,5 +1,8 @@
 [package]
+author = "ehsan2003.2003.382@gmail.com"
+description = "backend app for an r/place clone"
 edition = "2021"
+license = "GPL-3.0"
 name = "backend"
 version = "0.1.0"
 
