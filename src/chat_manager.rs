@@ -99,7 +99,7 @@ mod tests {
         time::Duration,
     };
 
-    use crate::{mock::Mock, rate_limiter::RateLimiterImpl};
+    use crate::{mock::Mock, rate_limiter_impl::RateLimiterImpl};
 
     use super::*;
     const MAX_MESSAGE_LENGTH: usize = 400;

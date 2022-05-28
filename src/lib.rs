@@ -4,6 +4,7 @@
 extern crate rstest;
 mod filters;
 mod game;
+mod rate_limiter_impl;
 use core::marker::Send;
 mod rate_limiter;
 mod users_handler;
@@ -27,7 +28,7 @@ use dtos::{Clients, ServerMessage};
 use futures::{SinkExt, StreamExt};
 
 use rand::{thread_rng, Rng};
-use rate_limiter::RateLimiterImpl;
+use rate_limiter_impl::RateLimiterImpl;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
     RwLock,

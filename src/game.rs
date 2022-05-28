@@ -133,7 +133,7 @@ impl std::error::Error for SetTileError {}
 mod tests {
     use std::{sync::Arc, vec};
 
-    use crate::rate_limiter::RateLimiterImpl;
+    use crate::rate_limiter_impl::RateLimiterImpl;
 
     use super::*;
     const WIDTH: u32 = 10;
