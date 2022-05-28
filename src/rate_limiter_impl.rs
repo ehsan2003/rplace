@@ -25,6 +25,7 @@ impl<T: Hash + Eq + Send + Sync> RateLimiterImpl<T> {
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) {
         let mut interval = tokio::time::interval(interval);
+        println!("GC");
         while let Some(now) = tokio::select! {
             now = interval.tick() => Some(now),
             _ = shutdown_rx.recv() => None,
@@ -35,7 +36,7 @@ impl<T: Hash + Eq + Send + Sync> RateLimiterImpl<T> {
                 let now = now.into_std();
                 *lock = lock
                     .drain()
-                    .filter(|(_, v)| v < &now)
+                    .filter(|(_, v)| v > &now)
                     .collect::<HashMap<T, Instant>>();
             };
         }
@@ -116,8 +117,26 @@ mod tests {
             tokio::spawn(async move { limiter.run_garbage_collector(DURATION / 100, rx).await });
         }
         limiter.mark_as_limited(1).await;
-        std::thread::sleep(DURATION - (DURATION / 50));
+        tokio::time::sleep(DURATION - (DURATION / 2)).await;
         assert!(!limiter.is_free(&1).await);
+        tx.send(());
+    }
+
+    #[rstest]
+    #[tokio::test]
+    async fn gc_should_clear_after_time_passed(limiter: RateLimiterImpl<u32>) {
+        let limiter = Arc::new(limiter);
+        let (tx, rx) = tokio::sync::broadcast::channel(1);
+
+        {
+            let limiter = limiter.clone();
+            tokio::spawn(async move { limiter.run_garbage_collector(DURATION, rx).await });
+        }
+        limiter.mark_as_limited(1).await;
+        tokio::time::sleep(DURATION * 3).await;
+        let list = limiter.list.read().unwrap();
+        println!("{:?}", list);
+        assert!(list.is_empty());
         tx.send(());
     }
 }
