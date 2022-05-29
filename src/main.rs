@@ -5,6 +5,7 @@ use rgb::{RGB, RGB8};
 
 #[tokio::main]
 async fn main() -> GenericResult<()> {
+    pretty_env_logger::init();
     let pallette = vec![
         0x6d001au32,
         0xbe0039,
@@ -42,7 +43,7 @@ async fn main() -> GenericResult<()> {
     .iter()
     .map(|f| {
         RGB8::new(
-            (f>> 16 & 0xff) as u8,
+            (f >> 16 & 0xff) as u8,
             (f >> 8 & 0xff) as u8,
             (f & 0xff) as u8,
         )

@@ -83,9 +83,11 @@ pub async fn run_app(general_config: GeneralConfig) -> GenericResult<()> {
         shared_state.clients.clone(),
         broadcast_tx.clone(),
     );
+
     warp::serve(get_routes(&shared_state, Arc::new(general_config.pallette)))
         .run(([127, 0, 0, 1], general_config.port))
         .await;
+
     Ok(())
 }
 
