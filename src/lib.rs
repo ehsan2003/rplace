@@ -7,7 +7,7 @@ mod game;
 mod rate_limiter_impl;
 use core::marker::Send;
 mod rate_limiter;
-mod users_handler;
+mod rpc_handler;
 
 mod chat_manager;
 
@@ -157,7 +157,7 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
     let clone = shared_state.clone();
-    let handler = users_handler::UserHandler::new(
+    let handler = rpc_handler::RPCHandler::new(
         clone.game,
         clone.message_handler,
         clone.broadcast_tx,

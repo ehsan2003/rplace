@@ -12,7 +12,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use std::net::IpAddr;
 use std::sync::Arc;
 
-pub struct UserHandler {
+pub struct RPCHandler {
     pub game: Arc<Game>,
     pub message_handler: Arc<ChatManager>,
     pub broadcast_tx: UnboundedSender<RPCServerMessage>,
@@ -20,7 +20,7 @@ pub struct UserHandler {
     pub(crate) local_sender: UnboundedSender<rpc_types::RPCServerMessage>,
 }
 
-impl UserHandler {
+impl RPCHandler {
     pub(crate) fn new(
         game: Arc<Game>,
         message_handler: Arc<ChatManager>,
