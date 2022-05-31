@@ -21,7 +21,10 @@ use self::{
     messages::message_censor_impl::MessageCensorerImpl,
 };
 use futures::{SinkExt, StreamExt};
-use rpc::{rpc_handler::RPCHandler, rpc_types::RPCServerMessage};
+use rpc::{
+    rpc_handler::RPCHandler,
+    rpc_types::{self, RPCServerMessage, RPCSetTileError},
+};
 
 use rand::{thread_rng, Rng};
 use rate_limit::rate_limiter_impl::RateLimiterImpl;
@@ -183,7 +186,21 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
             }
             _ => continue,
         };
-        handler.handle_incoming(client_message).await;
+
+        match client_message {
+            rpc_types::RPCClientMessage::SendMessage(input) => {
+                handler.handle_send_message(input).await;
+            }
+            rpc_types::RPCClientMessage::PlaceTile(input) => {
+                let res: Result<(), RPCSetTileError> = handler.handle_set_tile(&input).await;
+
+                if res.is_err() {
+                    let tile = handler.game.get_tile_color(input.idx);
+                    let message = rpc_types::RPCServerMessage::TilePlaced(input.idx, tile);
+                    handler.local_sender.clone().send(message);
+                };
+            }
+        };
     }
     shared_state.clients.write().await.remove(&random_id);
 }

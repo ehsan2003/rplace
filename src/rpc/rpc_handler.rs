@@ -22,25 +22,7 @@ pub struct RPCHandler {
 }
 
 impl RPCHandler {
-    pub async fn handle_incoming(&self, msg: rpc_types::RPCClientMessage) -> GenericResult<()> {
-        match msg {
-            rpc_types::RPCClientMessage::SendMessage(input) => {
-                self.handle_send_message(input).await?;
-            }
-            rpc_types::RPCClientMessage::PlaceTile(input) => {
-                let res: Result<(), RPCSetTileError> = self.handle_set_tile(&input).await;
-
-                if res.is_err() {
-                    let tile = self.game.get_tile_color(input.idx);
-                    let message = rpc_types::RPCServerMessage::TilePlaced(input.idx, tile);
-                    self.local_sender.clone().send(message)?;
-                };
-            }
-        };
-        Ok(())
-    }
-
-    async fn handle_set_tile(
+    pub(crate) async fn handle_set_tile(
         &self,
         input: &rpc_types::PlaceTileInput,
     ) -> Result<(), RPCSetTileError> {
