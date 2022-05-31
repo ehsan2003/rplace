@@ -21,7 +21,7 @@ use self::{
     messages::message_censor_impl::MessageCensorerImpl,
 };
 use futures::{SinkExt, StreamExt};
-use rpc::rpc_types::RPCServerMessage;
+use rpc::{rpc_handler::RPCHandler, rpc_types::RPCServerMessage};
 
 use rand::{thread_rng, Rng};
 use rate_limit::rate_limiter_impl::RateLimiterImpl;
@@ -152,14 +152,13 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
             .insert(random_id, local_sender.clone());
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
-    let clone = shared_state.clone();
-    let handler = rpc::rpc_handler::RPCHandler::new(
-        clone.game,
-        clone.message_handler,
-        clone.broadcast_tx,
+    let handler = RPCHandler {
+        game: shared_state.game.clone(),
+        message_handler: shared_state.message_handler.clone(),
+        broadcast_tx: shared_state.broadcast_tx.clone(),
         ip,
         local_sender,
-    );
+    };
 
     tokio::spawn(async move {
         while let Some(msg) = local_receiver.recv().await {

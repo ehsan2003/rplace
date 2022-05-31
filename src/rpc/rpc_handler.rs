@@ -21,21 +21,7 @@ pub struct RPCHandler {
 }
 
 impl RPCHandler {
-    pub(crate) fn new(
-        game: Arc<Game>,
-        message_handler: Arc<ChatManager>,
-        broadcast_tx: UnboundedSender<RPCServerMessage>,
-        ip: IpAddr,
-        local_sender: UnboundedSender<rpc_types::RPCServerMessage>,
-    ) -> Self {
-        Self {
-            game,
-            message_handler,
-            broadcast_tx,
-            ip,
-            local_sender,
-        }
-    }
+    
     pub async fn handle_incoming(&self, msg: rpc_types::RPCClientMessage) -> GenericResult<()> {
         match msg {
             rpc_types::RPCClientMessage::SendMessage(input) => {
