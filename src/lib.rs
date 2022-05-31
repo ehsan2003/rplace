@@ -12,20 +12,20 @@ mod users_handler;
 mod chat_manager;
 
 pub mod client;
-mod dtos;
 mod message_censor;
 mod message_censor_impl;
 #[cfg(test)]
 mod mock;
-use std::{collections::HashMap, error::Error, net::IpAddr, ops::Deref, sync::Arc, time::Duration};
+mod rpc_types;
+use std::{collections::HashMap, net::IpAddr, ops::Deref, sync::Arc, time::Duration};
 
 use self::{
     chat_manager::{ChatManager, ChatManagerConfig},
     game::{Game, GameConfig},
     message_censor_impl::MessageCensorerImpl,
 };
-use dtos::ServerMessage;
 use futures::{SinkExt, StreamExt};
+use rpc_types::RPCServerMessage;
 
 use rand::{thread_rng, Rng};
 use rate_limiter_impl::RateLimiterImpl;
@@ -38,8 +38,8 @@ use warp::{
     ws::{Message, Ws},
     Filter, Reply,
 };
-pub type GenericResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-pub type Clients = Arc<RwLock<HashMap<u64, UnboundedSender<ServerMessage>>>>;
+pub mod generic_result;
+pub type Clients = Arc<RwLock<HashMap<u64, UnboundedSender<RPCServerMessage>>>>;
 
 #[derive(Debug, Clone)]
 pub struct GeneralConfig {
@@ -61,15 +61,15 @@ pub struct GeneralConfig {
 pub(crate) struct SharedState {
     pub game: Arc<Game>,
     pub message_handler: Arc<ChatManager>,
-    pub broadcast_tx: UnboundedSender<ServerMessage>,
+    pub broadcast_tx: UnboundedSender<RPCServerMessage>,
     pub clients: Clients,
 }
-pub async fn run_app(general_config: GeneralConfig) -> GenericResult<()> {
+pub async fn run_app(general_config: GeneralConfig) -> generic_result::GenericResult<()> {
     let message_handler = create_chat_manager(&general_config);
 
     let game = create_game(&general_config)?;
 
-    let (broadcast_tx, broadcast_rx) = unbounded_channel::<ServerMessage>();
+    let (broadcast_tx, broadcast_rx) = unbounded_channel::<RPCServerMessage>();
     let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
     let shared_state = SharedState {
         game: Arc::new(game),
@@ -156,7 +156,14 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
             .insert(random_id, local_sender.clone());
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
-    let handler = users_handler::UserHandler::new(shared_state.clone(), ip, local_sender);
+    let clone = shared_state.clone();
+    let handler = users_handler::UserHandler::new(
+        clone.game,
+        clone.message_handler,
+        clone.broadcast_tx,
+        ip,
+        local_sender,
+    );
 
     tokio::spawn(async move {
         while let Some(msg) = local_receiver.recv().await {
@@ -186,7 +193,10 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
     shared_state.clients.write().await.remove(&random_id);
 }
 
-fn handle_broadcast_messages(clients: Clients, mut broadcast_rx: UnboundedReceiver<ServerMessage>) {
+fn handle_broadcast_messages(
+    clients: Clients,
+    mut broadcast_rx: UnboundedReceiver<RPCServerMessage>,
+) {
     tokio::spawn(async move {
         while let Some(msg) = broadcast_rx.recv().await {
             let clients = clients.read().await;
@@ -200,7 +210,7 @@ fn handle_broadcast_messages(clients: Clients, mut broadcast_rx: UnboundedReceiv
 fn register_user_count_updater(
     delay: Duration,
     clients: Clients,
-    broadcast_tx: UnboundedSender<ServerMessage>,
+    broadcast_tx: UnboundedSender<RPCServerMessage>,
 ) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(delay);
@@ -210,7 +220,7 @@ fn register_user_count_updater(
             let len = clients.len();
 
             broadcast_tx
-                .send(ServerMessage::UpdateUserCount(len as u32))
+                .send(RPCServerMessage::UpdateUserCount(len as u32))
                 .unwrap();
         }
     });

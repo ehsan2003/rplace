@@ -3,8 +3,8 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::{
-    dtos::{RPCClientMessage, ServerMessage},
-    GenericResult,
+    generic_result::GenericResult,
+    rpc_types::{RPCClientMessage, RPCServerMessage},
 };
 
 pub struct GameClient {
@@ -31,7 +31,7 @@ impl GameClient {
         .await?;
         Ok(())
     }
-    pub async fn receive_message(&self) -> GenericResult<ServerMessage> {
+    pub async fn receive_message(&self) -> GenericResult<RPCServerMessage> {
         let message = self.socket.lock().await.next().await.unwrap()?;
         Ok(serde_json::from_str(&message.into_text().unwrap()).unwrap())
     }

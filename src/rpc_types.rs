@@ -1,5 +1,5 @@
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub enum ServerMessage {
+pub enum RPCServerMessage {
     NewMessage {
         id: u64,
         reply_to: Option<u64>,
@@ -14,10 +14,10 @@ pub enum ServerMessage {
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct RPCSendMessageInput {
-    pub(crate) text: String,
-    pub(crate) reply_to: Option<u64>,
-    pub(crate) channel: String,
-    pub(crate) sender_name: String,
+    pub text: String,
+    pub reply_to: Option<u64>,
+    pub channel: String,
+    pub sender_name: String,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
