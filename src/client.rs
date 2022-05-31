@@ -3,7 +3,7 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::{
-    dtos::{ServerMessage, RPCClientMessage},
+    dtos::{RPCClientMessage, ServerMessage},
     GenericResult,
 };
 

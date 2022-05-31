@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use backend::{run_app, GeneralConfig, GenericResult};
-use rgb::{RGB, RGB8};
+use rgb::{RGB8};
 
 #[tokio::main]
 async fn main() -> GenericResult<()> {

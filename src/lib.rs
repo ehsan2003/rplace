@@ -186,10 +186,7 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
     shared_state.clients.write().await.remove(&random_id);
 }
 
-fn handle_broadcast_messages(
-    clients: Clients,
-    mut broadcast_rx: UnboundedReceiver<ServerMessage>,
-) {
+fn handle_broadcast_messages(clients: Clients, mut broadcast_rx: UnboundedReceiver<ServerMessage>) {
     tokio::spawn(async move {
         while let Some(msg) = broadcast_rx.recv().await {
             let clients = clients.read().await;

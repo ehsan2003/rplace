@@ -1,4 +1,4 @@
-use crate::{dtos,  GenericResult, SharedState};
+use crate::{dtos, GenericResult, SharedState};
 
 use super::game::SetTileError;
 
@@ -7,8 +7,6 @@ use super::chat_manager::SendMessageInput;
 use tokio::sync::mpsc::UnboundedSender;
 
 use std::net::IpAddr;
-
-
 
 pub struct UserHandler {
     pub(crate) shared_state: SharedState,
