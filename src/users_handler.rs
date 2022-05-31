@@ -28,12 +28,12 @@ impl UserHandler {
             local_sender,
         }
     }
-    pub async fn handle_incoming(&self, msg: dtos::WsClientMessage) -> GenericResult<()> {
+    pub async fn handle_incoming(&self, msg: dtos::RPCClientMessage) -> GenericResult<()> {
         match msg {
-            dtos::WsClientMessage::SendMessage(input) => {
+            dtos::RPCClientMessage::SendMessage(input) => {
                 self.handle_send_message(input).await?;
             }
-            dtos::WsClientMessage::PlaceTile(input) => {
+            dtos::RPCClientMessage::PlaceTile(input) => {
                 self.handle_set_tile(input).await?;
             }
         };
@@ -42,7 +42,7 @@ impl UserHandler {
 
     pub(crate) async fn handle_send_message(
         &self,
-        input: dtos::WsSendMessageInput,
+        input: dtos::RPCSendMessageInput,
     ) -> GenericResult<()> {
         let message = SendMessageInput {
             reply_to: input.reply_to,

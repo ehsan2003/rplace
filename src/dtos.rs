@@ -21,7 +21,7 @@ pub enum ServerMessage {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub struct WsSendMessageInput {
+pub struct RPCSendMessageInput {
     pub(crate) text: String,
     pub(crate) reply_to: Option<u64>,
     pub(crate) channel: String,
@@ -29,8 +29,8 @@ pub struct WsSendMessageInput {
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub enum WsClientMessage {
-    SendMessage(WsSendMessageInput),
+pub enum RPCClientMessage {
+    SendMessage(RPCSendMessageInput),
     PlaceTile(PlaceTileInput),
 }
 
@@ -40,4 +40,4 @@ pub struct PlaceTileInput {
     pub tile: u8,
 }
 
-pub type Clients = Arc<RwLock<HashMap<u64, UnboundedSender<ServerMessage>>>>;
+

@@ -3,7 +3,7 @@ use tokio::sync::Mutex;
 use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, WebSocketStream};
 
 use crate::{
-    dtos::{ServerMessage, WsClientMessage},
+    dtos::{ServerMessage, RPCClientMessage},
     GenericResult,
 };
 
@@ -20,7 +20,7 @@ impl GameClient {
     }
     pub async fn send_message(
         &self,
-        message: WsClientMessage,
+        message: RPCClientMessage,
     ) -> Result<(), Box<dyn std::error::Error>> {
         {
             self.socket

@@ -24,7 +24,7 @@ use self::{
     game::{Game, GameConfig},
     message_censor_impl::MessageCensorerImpl,
 };
-use dtos::{Clients, ServerMessage};
+use dtos::ServerMessage;
 use futures::{SinkExt, StreamExt};
 
 use rand::{thread_rng, Rng};
@@ -39,6 +39,7 @@ use warp::{
     Filter, Reply,
 };
 pub type GenericResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
+pub type Clients = Arc<RwLock<HashMap<u64, UnboundedSender<ServerMessage>>>>;
 
 #[derive(Debug, Clone)]
 pub struct GeneralConfig {
@@ -69,7 +70,7 @@ pub async fn run_app(general_config: GeneralConfig) -> GenericResult<()> {
     let game = create_game(&general_config)?;
 
     let (broadcast_tx, broadcast_rx) = unbounded_channel::<ServerMessage>();
-    let clients: dtos::Clients = Arc::new(RwLock::new(HashMap::new()));
+    let clients: Clients = Arc::new(RwLock::new(HashMap::new()));
     let shared_state = SharedState {
         game: Arc::new(game),
         message_handler: Arc::new(message_handler),
@@ -186,7 +187,7 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
 }
 
 fn handle_broadcast_messages(
-    clients: dtos::Clients,
+    clients: Clients,
     mut broadcast_rx: UnboundedReceiver<ServerMessage>,
 ) {
     tokio::spawn(async move {
@@ -201,7 +202,7 @@ fn handle_broadcast_messages(
 
 fn register_user_count_updater(
     delay: Duration,
-    clients: dtos::Clients,
+    clients: Clients,
     broadcast_tx: UnboundedSender<ServerMessage>,
 ) {
     tokio::spawn(async move {
