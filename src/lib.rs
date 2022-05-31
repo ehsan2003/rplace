@@ -100,7 +100,16 @@ fn create_game(
         tile_wait_time: general_config.game_tile_wait_time,
     };
     let game_rate_limit = Arc::new(RateLimiterImpl::new(game_config.tile_wait_time));
-
+    {
+        let l = game_rate_limit.clone();
+        tokio::spawn(async move {
+            l.run_garbage_collector(
+                Duration::from_secs(60),
+                tokio::sync::broadcast::channel(1).1,
+            )
+            .await;
+        });
+    }
     let game = match general_config.game_file.clone() {
         Some(f) => Game::load(f, game_config, game_rate_limit)?,
         None => Game::new(game_config, game_rate_limit),
@@ -111,6 +120,16 @@ fn create_game(
 fn create_chat_manager(general_config: &GeneralConfig) -> ChatManager {
     let message_censor = Arc::new(MessageCensorerImpl {});
     let rate_limiter = Arc::new(RateLimiterImpl::new(general_config.message_wait_time));
+    {
+        let l = rate_limiter.clone();
+        tokio::spawn(async move {
+            l.run_garbage_collector(
+                Duration::from_secs(60),
+                tokio::sync::broadcast::channel(1).1,
+            )
+            .await;
+        });
+    }
     let config = ChatManagerConfig {
         max_message_length: general_config.max_message_length,
         rate_limit_timeout_ms: general_config.message_wait_time,
