@@ -4,7 +4,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 
 use crate::{
     generic_result::GenericResult,
-    rpc_types::{RPCClientMessage, RPCServerMessage},
+    rpc::rpc_types::{RPCClientMessage, RPCServerMessage},
 };
 
 pub struct GameClient {

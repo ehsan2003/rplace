@@ -4,31 +4,27 @@
 extern crate rstest;
 mod filters;
 mod game;
-mod rate_limiter_impl;
-use core::marker::Send;
-mod rate_limiter;
-mod rpc_handler;
-
-mod chat_manager;
 
 pub mod client;
-mod message_censor;
-mod message_censor_impl;
+
+mod messages;
 #[cfg(test)]
 mod mock;
-mod rpc_types;
+mod rate_limit;
+pub mod rpc;
+
 use std::{collections::HashMap, net::IpAddr, ops::Deref, sync::Arc, time::Duration};
 
 use self::{
-    chat_manager::{ChatManager, ChatManagerConfig},
     game::{Game, GameConfig},
-    message_censor_impl::MessageCensorerImpl,
+    messages::chat_manager::{ChatManager, ChatManagerConfig},
+    messages::message_censor_impl::MessageCensorerImpl,
 };
 use futures::{SinkExt, StreamExt};
-use rpc_types::RPCServerMessage;
+use rpc::rpc_types::RPCServerMessage;
 
 use rand::{thread_rng, Rng};
-use rate_limiter_impl::RateLimiterImpl;
+use rate_limit::rate_limiter_impl::RateLimiterImpl;
 use rgb::RGB8;
 use tokio::sync::{
     mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender},
@@ -116,7 +112,7 @@ fn create_chat_manager(general_config: &GeneralConfig) -> ChatManager {
         max_message_length: general_config.max_message_length,
         rate_limit_timeout_ms: general_config.message_wait_time,
     };
-    chat_manager::ChatManager::new(config, message_censor, rate_limiter)
+    ChatManager::new(config, message_censor, rate_limiter)
 }
 
 fn get_routes(
@@ -157,7 +153,7 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
     let clone = shared_state.clone();
-    let handler = rpc_handler::RPCHandler::new(
+    let handler = rpc::rpc_handler::RPCHandler::new(
         clone.game,
         clone.message_handler,
         clone.broadcast_tx,

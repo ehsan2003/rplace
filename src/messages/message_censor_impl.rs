@@ -1,4 +1,4 @@
-use crate::message_censor::MessageCensorer;
+use super::message_censor::MessageCensorer;
 #[derive(Debug)]
 pub struct MessageCensorerImpl {}
 

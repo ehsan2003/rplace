@@ -5,7 +5,7 @@ use std::{
     time::Duration,
 };
 
-use crate::rate_limiter::SharedRateLimiter;
+use crate::rate_limit::rate_limiter::SharedRateLimiter;
 const MAX_COLOR: u8 = 31;
 
 #[derive(Debug, Clone)]
@@ -133,7 +133,7 @@ impl std::error::Error for SetTileError {}
 mod tests {
     use std::{sync::Arc, vec};
 
-    use crate::rate_limiter_impl::RateLimiterImpl;
+    use crate::rate_limit::rate_limiter_impl::RateLimiterImpl;
 
     use super::*;
     const WIDTH: u32 = 10;

@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::rate_limiter::RateLimiter;
+use super::rate_limiter::RateLimiter;
 
 #[derive(Debug)]
 pub struct RateLimiterImpl<T: Hash + Eq + Send + Sync> {

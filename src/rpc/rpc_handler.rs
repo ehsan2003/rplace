@@ -1,11 +1,11 @@
-use crate::chat_manager::ChatManager;
+use crate::messages::chat_manager::ChatManager;
 use crate::game::Game;
-use crate::rpc_types::RPCServerMessage;
-use crate::{generic_result::GenericResult, rpc_types};
+use crate::rpc::rpc_types::RPCServerMessage;
+use crate::{generic_result::GenericResult, rpc::rpc_types};
 
-use super::game::SetTileError;
+use crate::game::SetTileError;
 
-use super::chat_manager::SendMessageInput;
+use crate::messages::chat_manager::SendMessageInput;
 
 use tokio::sync::mpsc::UnboundedSender;
 

@@ -8,7 +8,8 @@ use std::{
     time::Duration,
 };
 
-use crate::{message_censor::MessageCensorer, rate_limiter::SharedRateLimiter};
+use super::message_censor::MessageCensorer;
+use crate::rate_limit::rate_limiter::SharedRateLimiter;
 
 #[derive(Clone, Debug)]
 pub struct ChatManagerConfig {
@@ -99,7 +100,7 @@ mod tests {
         time::Duration,
     };
 
-    use crate::{mock::Mock, rate_limiter_impl::RateLimiterImpl};
+    use crate::{mock::Mock, rate_limit::rate_limiter_impl::RateLimiterImpl};
 
     use super::*;
     const MAX_MESSAGE_LENGTH: usize = 400;
