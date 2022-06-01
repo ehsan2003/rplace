@@ -174,13 +174,12 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
             .insert(random_id, local_sender.clone());
     }
     let (mut websocket_sender, mut websocket_receiver) = socket.split();
-    let handler = RPCHandler {
-        game: shared_state.game.clone(),
-        message_handler: shared_state.message_handler.clone(),
-        broadcast_tx: shared_state.broadcast_tx.clone(),
+    let handler = RPCHandler::new(
+        shared_state.game.clone(),
+        shared_state.message_handler.clone(),
+        shared_state.broadcast_tx.clone(),
         ip,
-        local_sender,
-    };
+    );
 
     tokio::spawn(async move {
         while let Some(msg) = local_receiver.recv().await {
@@ -211,12 +210,14 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
                 handler.handle_send_message(input).await;
             }
             rpc_types::RPCClientMessage::PlaceTile(input) => {
-                let res: Result<(), RPCSetTileError> = handler.handle_set_tile(&input).await;
-
+                let res = handler.handle_set_tile(&input).await;
                 if res.is_err() {
-                    let tile = handler.game.get_tile_color(input.idx);
-                    let message = rpc_types::RPCServerMessage::TilePlaced(input.idx, tile);
-                    handler.local_sender.clone().send(message);
+                    let tile = shared_state.game.get_tile_color(input.idx);
+
+                    if let Some(tile) = tile {
+                        let message = rpc_types::RPCServerMessage::TilePlaced(input.idx, tile);
+                        local_sender.send(message);
+                    }
                 };
             }
         };

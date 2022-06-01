@@ -72,8 +72,8 @@ impl Game {
             rate_limiter,
         })
     }
-    pub fn get_tile_color(&self, idx: u32) -> u8 {
-        self.board.read().unwrap()[(idx) as usize]
+    pub fn get_tile_color(&self, idx: u32) -> Option<u8> {
+        self.board.read().unwrap().get((idx) as usize).copied()
     }
     pub async fn set_tile(&self, ip: IpAddr, index: u32, color: u8) -> Result<(), SetTileError> {
         if !self.rate_limiter.is_free(&ip).await {

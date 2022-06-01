@@ -1,7 +1,7 @@
 use crate::game::Game;
 use crate::messages::chat_manager::ChatManager;
+use crate::rpc::rpc_types;
 use crate::rpc::rpc_types::RPCServerMessage;
-use crate::{generic_result::GenericResult, rpc::rpc_types};
 
 use crate::messages::chat_manager::SendMessageInput;
 
@@ -14,21 +14,39 @@ use std::sync::Arc;
 use super::rpc_types::{RPCSendMessageError, RPCSetTileError};
 
 pub struct RPCHandler {
-    pub game: Arc<Game>,
-    pub message_handler: Arc<ChatManager>,
-    pub broadcast_tx: UnboundedSender<RPCServerMessage>,
-    pub(crate) ip: IpAddr,
-    pub(crate) local_sender: UnboundedSender<rpc_types::RPCServerMessage>,
+    game: Arc<Game>,
+    message_handler: Arc<ChatManager>,
+    broadcast_tx: UnboundedSender<RPCServerMessage>,
+    ip: IpAddr,
 }
-
 impl RPCHandler {
+    pub fn new(
+        game: Arc<Game>,
+        message_handler: Arc<ChatManager>,
+        broadcast_tx: UnboundedSender<RPCServerMessage>,
+        ip: IpAddr,
+    ) -> Self {
+        Self {
+            game,
+            message_handler,
+            broadcast_tx,
+            ip,
+        }
+    }
+
     pub(crate) async fn handle_set_tile(
         &self,
         input: &rpc_types::PlaceTileInput,
     ) -> Result<(), RPCSetTileError> {
+        let current_color = self.game.get_tile_color(input.idx);
+        if let Some(current_color) = current_color {
+            if current_color == input.tile {
+                return Ok(());
+            }
+        }
         let res = self.game.set_tile(self.ip, input.idx, input.tile).await?;
-        let message = rpc_types::RPCServerMessage::TilePlaced(input.idx, input.tile);
-        self.broadcast_tx.send(message).unwrap();
+        let rpc_message = rpc_types::RPCServerMessage::TilePlaced(input.idx, input.tile);
+        self.broadcast_tx.send(rpc_message).unwrap();
         Ok(res)
     }
 
