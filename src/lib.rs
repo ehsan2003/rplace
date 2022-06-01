@@ -23,7 +23,7 @@ use self::{
 use futures::{SinkExt, StreamExt};
 use rpc::{
     rpc_handler::RPCHandler,
-    rpc_types::{self, RPCServerMessage, RPCSetTileError},
+    rpc_types::{self, RPCServerMessage},
 };
 
 use rand::{thread_rng, Rng};
