@@ -21,6 +21,7 @@ use self::{
     messages::message_censor_impl::MessageCensorerImpl,
 };
 use futures::{SinkExt, StreamExt};
+use log::info;
 use rpc::{
     rpc_handler::RPCHandler,
     rpc_types::{self, RPCServerMessage},
@@ -187,7 +188,7 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
                 .send(Message::text(serde_json::to_string(&msg).unwrap()))
                 .await
             {
-                println!("Error sending message: {}", e);
+                info!("Error sending message: {}", e);
                 break;
             }
         }
@@ -199,7 +200,7 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
                 Err(_) => continue,
             },
             Err(_) => {
-                eprintln!("Error");
+                info!("Error");
                 break;
             }
             _ => continue,

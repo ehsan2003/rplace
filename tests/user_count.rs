@@ -1,4 +1,4 @@
-use backend::client::{self, GameClient};
+use backend::client::GameClient;
 use backend::generic_result::GenericResult;
 use backend::rpc::rpc_types::RPCServerMessage;
 use backend::{run_app, GeneralConfig, GeneralConfigBuilder};

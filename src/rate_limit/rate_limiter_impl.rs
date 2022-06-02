@@ -5,6 +5,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+use log::info;
+
 use super::rate_limiter::RateLimiter;
 
 #[derive(Debug)]
@@ -25,7 +27,7 @@ impl<T: Hash + Eq + Send + Sync> RateLimiterImpl<T> {
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) {
         let mut interval = tokio::time::interval(interval);
-        println!("GC");
+        info!("GC");
         while let Some(now) = tokio::select! {
             now = interval.tick() => Some(now),
             _ = shutdown_rx.recv() => None,
@@ -135,7 +137,6 @@ mod tests {
         limiter.mark_as_limited(1).await;
         tokio::time::sleep(DURATION * 3).await;
         let list = limiter.list.read().unwrap();
-        println!("{:?}", list);
         assert!(list.is_empty());
         tx.send(());
     }

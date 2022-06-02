@@ -1,4 +1,7 @@
-use std::{fmt::{Display, Debug}, ops::Deref};
+use std::{
+    fmt::{Debug, Display},
+    ops::Deref,
+};
 
 use crate::{game::SetTileError, messages::chat_manager::ChatError};
 
