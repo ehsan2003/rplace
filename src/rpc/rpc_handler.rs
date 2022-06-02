@@ -11,7 +11,7 @@ use std::net::IpAddr;
 
 use std::sync::Arc;
 
-use super::rpc_types::{RPCSendMessageError, RPCSetTileError};
+use super::rpc_types::{RPCSendMessageError, RPCSetTileError, Tile};
 
 pub struct RPCHandler {
     game: Arc<Game>,
@@ -36,7 +36,7 @@ impl RPCHandler {
 
     pub(crate) async fn handle_set_tile(
         &self,
-        input: &rpc_types::PlaceTileInput,
+        input: &rpc_types::Tile,
     ) -> Result<(), RPCSetTileError> {
         let current_color = self.game.get_tile_color(input.idx);
         if let Some(current_color) = current_color {
@@ -45,7 +45,7 @@ impl RPCHandler {
             }
         }
         let res = self.game.set_tile(self.ip, input.idx, input.tile).await?;
-        let rpc_message = rpc_types::RPCServerMessage::TilePlaced(input.idx, input.tile);
+        let rpc_message = rpc_types::RPCServerMessage::TilePlaced(Tile::new(input.idx, input.tile));
         self.broadcast_tx.send(rpc_message).unwrap();
         Ok(res)
     }

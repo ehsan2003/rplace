@@ -15,7 +15,7 @@ pub enum RPCServerMessage {
         sender_name: String,
     },
     UpdateUserCount(u32),
-    TilePlaced(u32, u8),
+    TilePlaced(Tile),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -29,13 +29,19 @@ pub struct RPCSendMessageInput {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub enum RPCClientMessage {
     SendMessage(RPCSendMessageInput),
-    PlaceTile(PlaceTileInput),
+    PlaceTile(Tile),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub struct PlaceTileInput {
+pub struct Tile {
     pub idx: u32,
     pub tile: u8,
+}
+
+impl Tile {
+    pub fn new(idx: u32, tile: u8) -> Self {
+        Self { idx, tile }
+    }
 }
 
 impl From<SetTileError> for RPCSetTileError {

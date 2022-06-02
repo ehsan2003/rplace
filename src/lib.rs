@@ -26,7 +26,7 @@ use futures::{SinkExt, StreamExt};
 use log::info;
 use rpc::{
     rpc_handler::RPCHandler,
-    rpc_types::{self, RPCServerMessage},
+    rpc_types::{self, RPCServerMessage, Tile},
 };
 
 use rand::{thread_rng, Rng};
@@ -218,7 +218,8 @@ async fn handle_connection(shared_state: SharedState, ip: IpAddr, socket: warp::
                     let tile = shared_state.game.get_tile_color(input.idx);
 
                     if let Some(tile) = tile {
-                        let message = rpc_types::RPCServerMessage::TilePlaced(input.idx, tile);
+                        let message =
+                            rpc_types::RPCServerMessage::TilePlaced(Tile::new(input.idx, tile));
                         local_sender.send(message);
                     }
                 };
