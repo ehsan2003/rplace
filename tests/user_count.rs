@@ -2,8 +2,8 @@ use backend::client::GameClient;
 use backend::generic_result::GenericResult;
 use backend::rpc::rpc_types::RPCServerMessage;
 use backend::test_utils::*;
-use backend::{run_app, GeneralConfig, GeneralConfigBuilder};
-use rgb::RGB8;
+use backend::{run_app, GeneralConfig};
+
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Barrier;
