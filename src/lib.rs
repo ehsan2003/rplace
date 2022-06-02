@@ -13,6 +13,8 @@ mod mock;
 mod rate_limit;
 pub mod rpc;
 
+pub mod test_utils;
+
 use std::{collections::HashMap, net::IpAddr, ops::Deref, sync::Arc, time::Duration};
 
 use self::{
