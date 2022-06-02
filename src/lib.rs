@@ -40,7 +40,7 @@ use warp::{
 pub mod generic_result;
 pub type Clients = Arc<RwLock<HashMap<u64, UnboundedSender<RPCServerMessage>>>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, derive_builder::Builder)]
 pub struct GeneralConfig {
     pub port: u16,
     pub game_width: u32,
@@ -242,7 +242,7 @@ fn handle_broadcast_messages(
 fn register_user_count_updater(
     delay: Duration,
     clients: Clients,
-    broadcast_tx: UnboundedSender<RPCServerMessage>,
+    _: UnboundedSender<RPCServerMessage>,
 ) {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(delay);
@@ -250,10 +250,11 @@ fn register_user_count_updater(
             interval.tick().await;
             let clients = clients.read().await;
             let len = clients.len();
+            let msg = RPCServerMessage::UpdateUserCount(len as u32);
 
-            broadcast_tx
-                .send(RPCServerMessage::UpdateUserCount(len as u32))
-                .unwrap();
+            for (_, tx) in clients.iter() {
+                tx.send(msg.clone());
+            }
         }
     });
 }

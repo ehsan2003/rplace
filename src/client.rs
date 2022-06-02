@@ -35,4 +35,8 @@ impl GameClient {
         let message = self.socket.lock().await.next().await.unwrap()?;
         Ok(serde_json::from_str(&message.into_text().unwrap()).unwrap())
     }
+    pub async fn disconnect(&self) -> GenericResult<()> {
+        self.socket.lock().await.close(None).await?;
+        Ok(())
+    }
 }

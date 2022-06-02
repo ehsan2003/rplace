@@ -13,7 +13,6 @@ pub enum RPCServerMessage {
     },
     UpdateUserCount(u32),
     TilePlaced(u32, u8),
-    TilesPlaced(Vec<(u32, u8)>),
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
