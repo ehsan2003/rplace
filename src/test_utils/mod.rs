@@ -67,13 +67,7 @@ pub fn default_builder() -> GeneralConfigBuilder {
     builder
 }
 
-#[rstest::fixture]
-pub fn config() -> GeneralConfig {
-    default_builder()
-        .update_user_count_interval(Duration::from_millis(10))
-        .build()
-        .unwrap()
-}
+
 
 pub async fn connect(port: u16) -> GameClient {
     GameClient::connect(&format!("ws://127.0.0.1:{port}/ws"))

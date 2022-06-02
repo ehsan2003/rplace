@@ -7,7 +7,7 @@ use std::{
 
 use crate::rate_limit::rate_limiter::SharedRateLimiter;
 const MAX_COLOR: u8 = 31;
-
+pub const DEFAULT_COLOR: u8 = 31;
 #[derive(Debug, Clone)]
 pub struct GameConfig {
     pub width: u32,
@@ -36,7 +36,7 @@ impl Game {
         Self {
             width: config.width,
             height: config.height,
-            board: RwLock::new(vec![31; (config.width * config.height) as usize]),
+            board: RwLock::new(vec![DEFAULT_COLOR; (config.width * config.height) as usize]),
             rate_limiter,
         }
     }

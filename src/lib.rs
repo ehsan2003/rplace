@@ -12,7 +12,7 @@ mod messages;
 mod mock;
 mod rate_limit;
 pub mod rpc;
-
+pub use game::DEFAULT_COLOR;
 pub mod test_utils;
 
 use std::{collections::HashMap, net::IpAddr, ops::Deref, sync::Arc, time::Duration};

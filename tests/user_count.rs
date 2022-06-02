@@ -8,7 +8,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Barrier;
 const COUNT_TO_REACH: usize = 10;
-
+#[rstest::fixture]
+pub fn config() -> GeneralConfig {
+    default_builder()
+        .update_user_count_interval(Duration::from_millis(10))
+        .build()
+        .unwrap()
+}
 #[rstest::rstest]
 #[tokio::test]
 async fn it_should_send_correct_count(config: GeneralConfig) -> GenericResult<()> {
